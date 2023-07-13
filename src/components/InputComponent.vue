@@ -1,5 +1,5 @@
 <script setup>
-import data from '../assets/data/data.json'
+// import data from '../assets/data/data.json'
 import { computed } from 'vue'
 
 const props = defineProps({
@@ -25,8 +25,8 @@ const addLocationToJsonFile = () => {
     latitude: props.latitude
   }
   //   permanent push to json file
-  data.push(newData)
-  console.log(data)
+  // data.push(newData)
+  // console.log(data)
 
   //   reset input fields
   //   props.name = ''
