@@ -60,6 +60,6 @@ export const useLocationStore = defineStore({
   },
 
   persist: {
-    enabled: false
+    enabled: true
   }
 })
