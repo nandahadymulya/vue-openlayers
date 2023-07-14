@@ -223,7 +223,7 @@ onUnmounted(() => {
       <div class="text-right">
         <button
           class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-1 px-4 text-sm rounded"
-          @click="selectedCluster = null"
+          @click="selectedMarker = null"
         >
           X
         </button>
@@ -234,20 +234,3 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
-
-<style scoped>
-.map-container {
-  width: 100%;
-  height: 900px;
-}
-
-.marker-info {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background-color: white;
-  padding: 10px;
-  border-radius: 5px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-</style>
