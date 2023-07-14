@@ -22,6 +22,7 @@ const selectedCluster = ref(null)
 const selectedMarker = ref(null)
 
 let map
+let markerLayer
 
 // Main coordinate
 const mainCoordinate = {
@@ -78,7 +79,7 @@ const initMarker = () => {
   })
 
   const clusterSource = new Cluster({
-    distance: 40,
+    distance: 50,
     source: markerSource
   })
 
@@ -119,7 +120,7 @@ const initMarker = () => {
     }
   }
 
-  const markerLayer = new VectorLayer({
+  markerLayer = new VectorLayer({
     source: clusterSource,
     style: markerStyle
   })
@@ -146,12 +147,28 @@ const selectMarker = () => {
   })
 }
 
+// const enableMarkerDrag = () => {
+//   dragInteraction = new DragAndDrop({
+//     source: markerLayer.getSource(),
+//     formatConstructors: [GeoJSON]
+//   })
+//   map.addInteraction(dragInteraction)
+
+//   dragInteraction.on('dragend', (event) => {
+//     const feature = event.features.item(0)
+//     const coordinates = toLonLat(feature.getGeometry().getCoordinates())
+//     const { name } = feature.getProperties()
+//     selectedMarker.value = { name, latitude: coordinates[1], longitude: coordinates[0] }
+//   })
+// }
+
 onMounted(() => {
   initMap()
   setInterval(() => {
     initMarker()
   }, 2000)
   selectMarker()
+  // enableMarkerDrag()
 })
 
 onUnmounted(() => {
@@ -159,6 +176,9 @@ onUnmounted(() => {
     map.dispose()
     map = null
   }
+  // if (dragInteraction) {
+  //   map.removeInteraction(dragInteraction)
+  // }
 })
 </script>
 
@@ -169,20 +189,10 @@ onUnmounted(() => {
   </div>
   <div class="bg-orange-100 p-4 mx-4">
     <div v-if="selectedCluster">
-      <div class="text-center">
+      <div class="flex justify-between">
         <div class="text-lg font-bold">
-          Cluster &mdash;
-          <span class="text-sm"> {{ selectedCluster.features.length }} Markers </span>
-        </div>
-        <div class="border border-bottom solid my-1 border-orange-500"></div>
-        <div
-          v-for="marker in selectedCluster.features"
-          class="flex gap-2 items-center justify-center"
-        >
-          <div class="text-lg font-bold">{{ marker.get('name') }}</div>
-          &mdash;
-          <div class="text-sm">Longitude: {{ marker.get('longitude') }}</div>
-          <div class="text-sm">Latitude: {{ marker.get('latitude') }}</div>
+          Cluster of
+          {{ selectedCluster.features.length }} Markers
         </div>
         <div class="text-right">
           <button
@@ -191,6 +201,15 @@ onUnmounted(() => {
           >
             X
           </button>
+        </div>
+      </div>
+      <div>
+        <div class="border border-bottom solid my-1 border-orange-500"></div>
+        <div v-for="marker in selectedCluster.features" class="flex gap-2 items-center">
+          <div class="text-lg font-bold">{{ marker.get('name') }}</div>
+          &mdash;
+          <div class="text-sm">Longitude: {{ marker.get('longitude') }}</div>
+          <div class="text-sm">Latitude: {{ marker.get('latitude') }}</div>
         </div>
       </div>
     </div>
