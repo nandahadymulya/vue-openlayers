@@ -2,16 +2,13 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 
 import 'ol/ol.css'
-import Map from 'ol/Map'
-import View from 'ol/View'
-import TileLayer from 'ol/layer/Tile'
-import OSM from 'ol/source/OSM'
-import Feature from 'ol/Feature'
-import Point from 'ol/geom/Point'
-import { fromLonLat } from 'ol/proj'
-import { Vector as VectorLayer } from 'ol/layer'
-import { Vector as VectorSource } from 'ol/source'
-import { Style, Icon } from 'ol/style'
+import { Map, View, Feature } from 'ol'
+import { Tile as TileLayer, Vector as VectorLayer } from 'ol/layer'
+import { Point } from 'ol/geom'
+import { fromLonLat, toLonLat } from 'ol/proj'
+import { Cluster, OSM, Vector as VectorSource } from 'ol/source'
+import { Icon, Circle as CircleStyle, Fill, Stroke, Style, Text } from 'ol/style'
+import { DragAndDrop } from 'ol/interaction'
 
 import { useLocationStore } from '../stores/location'
 import pin from '../assets/icons/pin.png'
@@ -20,6 +17,8 @@ const locationStore = useLocationStore()
 const listLocation = locationStore.getLocations
 
 const mapContainer = ref(null)
+const markerCoordinates = ref(null)
+const selectedCluster = ref(null)
 const selectedMarker = ref(null)
 
 let map
@@ -30,6 +29,9 @@ const mainCoordinate = {
   latitude: -7.7956
 }
 
+// Zoom level
+const zoomLevel = 10
+
 const initMap = () => {
   // Set the projection to EPSG:3857 (Web Mercator)
   const projection = 'EPSG:3857'
@@ -39,18 +41,23 @@ const initMap = () => {
     projection
   )
 
+  // raster layer
+  const raster = new TileLayer({
+    source: new OSM()
+  })
+
+  // set view
+  const view = new View({
+    center: mainCoordinateInProjection,
+    projection,
+    zoom: zoomLevel
+  })
+
+  // create map
   map = new Map({
     target: mapContainer.value,
-    layers: [
-      new TileLayer({
-        source: new OSM()
-      })
-    ],
-    view: new View({
-      center: mainCoordinateInProjection,
-      projection,
-      zoom: 10
-    })
+    layers: [raster],
+    view: view
   })
 }
 
@@ -70,16 +77,50 @@ const initMarker = () => {
     markerSource.addFeature(marker)
   })
 
-  const markerStyle = new Style({
-    image: new Icon({
-      src: pin, // Replace with your own marker icon path
-      scale: 1,
-      anchor: [0.5, 1]
+  const clusterSource = new Cluster({
+    distance: 40,
+    source: markerSource
+  })
+
+  const clusterStyle = new Style({
+    image: new CircleStyle({
+      radius: 12,
+      fill: new Fill({ color: '#1a6be3' }),
+      stroke: new Stroke({ color: '#fff', width: 2 })
+    }),
+    text: new Text({
+      text: clusterSource.getFeatures().length.toString(),
+      fill: new Fill({ color: '#fff' }),
+      font: 'bold 12px sans-serif'
     })
   })
 
+  const markerStyle = (feature) => {
+    const size = feature.get('features').length
+    if (size > 1) {
+      clusterStyle.getText().setText(size.toString())
+      return clusterStyle
+    } else {
+      const { name } = feature.get('features')[0].getProperties()
+      const style = new Style({
+        image: new Icon({
+          src: pin,
+          scale: 1,
+          anchor: [0.5, 1]
+        }),
+        text: new Text({
+          text: name,
+          offsetY: -36,
+          fill: new Fill({ color: '#333' }),
+          font: '12px sans-serif'
+        })
+      })
+      return style
+    }
+  }
+
   const markerLayer = new VectorLayer({
-    source: markerSource,
+    source: clusterSource,
     style: markerStyle
   })
 
@@ -89,7 +130,18 @@ const initMarker = () => {
 const selectMarker = () => {
   map.on('click', (event) => {
     map.forEachFeatureAtPixel(event.pixel, (feature) => {
-      selectedMarker.value = feature.getProperties()
+      if (feature.get('features').length > 1) {
+        // cluster clicked
+        selectedCluster.value = feature.getProperties()
+        selectedMarker.value = null
+      } else {
+        // single marker clicked
+        selectedCluster.value = null
+        selectedMarker.value = feature.getProperties()
+      }
+
+      const coordinates = toLonLat(feature.getGeometry().getCoordinates())
+      markerCoordinates.value = coordinates
     })
   })
 }
@@ -99,7 +151,6 @@ onMounted(() => {
   setInterval(() => {
     initMarker()
   }, 2000)
-
   selectMarker()
 })
 
@@ -112,28 +163,55 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="mapContainer" class="h-[40rem] p-4 rounded-lg"></div>
-  <div class="bg-orange-100 rounded m-4">
-    <div v-if="selectedMarker">
-      <div class="p-3 text-center">
-        <div class="text-lg font-bold">{{ selectedMarker.name }}</div>
+  <div ref="mapContainer" class="h-[36rem] p-4 rounded-lg"></div>
+  <div class="bg-orange-500 text-white p-3 text-center mx-4">
+    Current Coordinates: {{ markerCoordinates }}
+  </div>
+  <div class="bg-orange-100 p-4 mx-4">
+    <div v-if="selectedCluster">
+      <div class="text-center">
+        <div class="text-lg font-bold">
+          Cluster &mdash;
+          <span class="text-sm"> {{ selectedCluster.features.length }} Markers </span>
+        </div>
         <div class="border border-bottom solid my-1 border-orange-500"></div>
-        <div class="text-sm">Latitude: {{ selectedMarker.latitude }}</div>
-        <div class="text-sm">Longitude: {{ selectedMarker.longitude }}</div>
+        <div
+          v-for="marker in selectedCluster.features"
+          class="flex gap-2 items-center justify-center"
+        >
+          <div class="text-lg font-bold">{{ marker.get('name') }}</div>
+          &mdash;
+          <div class="text-sm">Longitude: {{ marker.get('longitude') }}</div>
+          <div class="text-sm">Latitude: {{ marker.get('latitude') }}</div>
+        </div>
         <div class="text-right">
           <button
             class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-1 px-4 text-sm rounded"
-            @click="selectedMarker = null"
+            @click="selectedCluster = null"
           >
             X
           </button>
         </div>
       </div>
     </div>
-    <div v-else>
-      <div class="text-center text-lg font-bold mt-3">
-        Click on the marker to see the information
+    <div v-else-if="selectedMarker">
+      <div v-for="marker in selectedMarker.features" class="flex gap-2 items-center justify-center">
+        <div class="text-lg font-bold">{{ marker.get('name') }}</div>
+        &mdash;
+        <div class="text-sm">Longitude: {{ marker.get('longitude') }}</div>
+        <div class="text-sm">Latitude: {{ marker.get('latitude') }}</div>
       </div>
+      <div class="text-right">
+        <button
+          class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-1 px-4 text-sm rounded"
+          @click="selectedCluster = null"
+        >
+          X
+        </button>
+      </div>
+    </div>
+    <div v-else>
+      <div class="text-center text-lg font-bold">Click on the marker to see the information</div>
     </div>
   </div>
 </template>
